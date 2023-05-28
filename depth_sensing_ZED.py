@@ -26,9 +26,6 @@
 import sys
 import ogl_viewer.viewer as gl
 import pyzed.sl as sl
-from ultralytics import YOLO
-import math
-import cv2
 
 def parseArg(argLen, argv, param):
     if(argLen>1):
@@ -66,51 +63,13 @@ def parseArg(argLen, argv, param):
             param.camera_resolution = sl.RESOLUTION.VGA
             print("Using camera in VGA mode")
 
-def inferAndMakeBox(source,show):
-    results = model.predict(source=source,show = show, conf = 0.8) 
-    boxCoordinates=results[0].boxes.xyxy.numpy()
-    return boxCoordinates
-
-def getBoxCenter(box_coordinate):
-
-    if box_coordinate.size > 0:
-            x_0 = math.trunc(box_coordinate.item(0)/2)
-            y_0 = math.trunc(box_coordinate.item(1)/2)
-            x_med = math.trunc(box_coordinate.item(2)/2)
-            y_med= math.trunc(box_coordinate.item(3)/2)
-            x_depth = x_0 + x_med
-            y_depth = y_0 + y_med
-            location=(x_depth,y_depth)
-            return location
-
-    else:
-            
-            print('The array has a size of 0')
-            location=(100,100)
-            return location
-
-def get3dPoint(x,y,point_cloud,depth):
-    point3D = point_cloud.get_value(x, y)
-    x_cloud = point3D[1][0]*100
-    y_cloud = point3D[1][1]*100
-    z_cloud = point3D[1][2]*10
-    z_depth=depth.get_value(x,y)[1]
-    return point3D
-def FPS():
-    currentFPS = str(zed.get_current_fps())
-    return currentFPS
-
-
-model = YOLO("yolov8n-seg.pt")
-
 
 if __name__ == "__main__":
     print("Running Depth Sensing sample ... Press 'Esc' to quit\nPress 's' to save the point cloud")
 
-    init = sl.InitParameters(   
-                                depth_mode=sl.DEPTH_MODE.ULTRA,
-                                coordinate_units=sl.UNIT.METER,
-                                coordinate_system=sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP)
+    init = sl.InitParameters(depth_mode=sl.DEPTH_MODE.ULTRA,
+                                 coordinate_units=sl.UNIT.METER,
+                                 coordinate_system=sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP)
     if (len(sys.argv) > 1):
         parseArg(len(sys.argv), sys.argv[1], init)
     zed = sl.Camera()
@@ -120,8 +79,8 @@ if __name__ == "__main__":
         exit()
 
     res = sl.Resolution()
-    res.width = 1280
-    res.height = 720
+    res.width = 720
+    res.height = 404
 
     camera_model = zed.get_camera_information().camera_model
     # Create OpenGL viewer
@@ -129,26 +88,11 @@ if __name__ == "__main__":
     viewer.init(1, sys.argv, camera_model, res)
 
     point_cloud = sl.Mat(res.width, res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
-    image = sl.Mat()
-    depth = sl.Mat()
+
     while viewer.is_available():
         if zed.grab() == sl.ERROR_CODE.SUCCESS:
-
             zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA,sl.MEM.CPU, res)
-            zed.retrieve_image(image, sl.VIEW.LEFT)
-            zed.retrieve_measure(depth, sl.MEASURE.DEPTH)
-            stream = image.get_data()
-
-            image_without_alpha = stream[:,:,:3]
-            box_coordinate=inferAndMakeBox(image_without_alpha,False)
-            location=getBoxCenter(box_coordinate)
-            cv2.circle(stream, location, 5, (0,255,100), -1)
-
             viewer.updateData(point_cloud)
-            point3D=get3dPoint(location[0],location[1],point_cloud,depth)
-            print(stream.shape)
-            print(point3D)
-            cv2.imshow('video',stream)
-
+            
     viewer.exit()
     zed.close()
