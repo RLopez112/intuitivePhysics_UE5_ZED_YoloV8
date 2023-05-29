@@ -67,9 +67,9 @@ def parseArg(argLen, argv, param):
             print("Using camera in VGA mode")
 
 def inferAndMakeBox(source,show):
-    results = model.predict(source=source,show = show, conf = 0.8) 
-    boxCoordinates=results[0].boxes.xyxy.numpy()
-    return boxCoordinates
+    results = model.predict(source=source,show = show, conf = 0.7) 
+    
+    return results
 
 def getBoxCenter(box_coordinate):
 
@@ -93,9 +93,10 @@ def get3dPoint(x,y,point_cloud,depth):
     point3D = point_cloud.get_value(x, y)
     x_cloud = point3D[1][0]*100
     y_cloud = point3D[1][1]*100
-    z_cloud = point3D[1][2]*10
+    z_cloud = point3D[1][2]*100
     z_depth=depth.get_value(x,y)[1]
-    return point3D
+    return (x_cloud,y_cloud,z_cloud)
+
 def FPS():
     currentFPS = str(zed.get_current_fps())
     return currentFPS
@@ -111,6 +112,9 @@ if __name__ == "__main__":
                                 depth_mode=sl.DEPTH_MODE.ULTRA,
                                 coordinate_units=sl.UNIT.METER,
                                 coordinate_system=sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP)
+    
+
+    trail=[]
     if (len(sys.argv) > 1):
         parseArg(len(sys.argv), sys.argv[1], init)
     zed = sl.Camera()
@@ -124,6 +128,7 @@ if __name__ == "__main__":
     res.height = 720
 
     camera_model = zed.get_camera_information().camera_model
+
     # Create OpenGL viewer
     viewer = gl.GLViewer()
     viewer.init(1, sys.argv, camera_model, res)
@@ -131,24 +136,35 @@ if __name__ == "__main__":
     point_cloud = sl.Mat(res.width, res.height, sl.MAT_TYPE.F32_C4, sl.MEM.CPU)
     image = sl.Mat()
     depth = sl.Mat()
+
     while viewer.is_available():
+
         if zed.grab() == sl.ERROR_CODE.SUCCESS:
 
             zed.retrieve_measure(point_cloud, sl.MEASURE.XYZRGBA,sl.MEM.CPU, res)
             zed.retrieve_image(image, sl.VIEW.LEFT)
             zed.retrieve_measure(depth, sl.MEASURE.DEPTH)
             stream = image.get_data()
+            
+            image_without_alpha = stream[:,:,:3] #esto consume 
+            results=inferAndMakeBox(image_without_alpha,False)
 
-            image_without_alpha = stream[:,:,:3]
-            box_coordinate=inferAndMakeBox(image_without_alpha,False)
-            location=getBoxCenter(box_coordinate)
+            
+            #print(results[0].masks[0].xy) #cuando no hay nada se rompe
+
+            box_coordinates=results[0].boxes.xyxy.numpy()
+            location=getBoxCenter(box_coordinates)
+
             cv2.circle(stream, location, 5, (0,255,100), -1)
 
             viewer.updateData(point_cloud)
             point3D=get3dPoint(location[0],location[1],point_cloud,depth)
-            print(stream.shape)
-            print(point3D)
+            trail.append(point3D)
+            print(point_cloud)
+            print(FPS())
+            
             cv2.imshow('video',stream)
 
     viewer.exit()
+    print(trail)
     zed.close()
