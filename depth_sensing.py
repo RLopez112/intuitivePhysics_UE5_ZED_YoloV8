@@ -29,6 +29,7 @@ import pyzed.sl as sl
 from ultralytics import YOLO
 import math
 import cv2
+import csv
 
 def parseArg(argLen, argv, param):
     if(argLen>1):
@@ -67,7 +68,8 @@ def parseArg(argLen, argv, param):
             print("Using camera in VGA mode")
 
 def inferAndMakeBox(source,show):
-    results = model.predict(source=source,show = show, conf = 0.7) 
+
+    results = model.predict(source=source,show = show, conf = 0.45) 
     
     return results
 
@@ -101,8 +103,21 @@ def FPS():
     currentFPS = str(zed.get_current_fps())
     return currentFPS
 
+def saveCSV(x,y,z,object):
+    location = "(X="+str(x)+"Y="+str(y)+"Z="+str(z)+")"
+    header = ['---', 'boundingBoxLocation', 'boundingBoxRotation', 'boundingBoxScale','SHAPE','fbxPath','pointCloudPath','SimulatePhysicsFromStart?','GravitiAffectsIt?','id','initialSpeedVector']
+    data = ['NewRow',location,'(Pitch=0,Yaw=0,Roll=0)','(X=1,Y=1,Z=1)',0]
 
-model = YOLO("yolov8n-seg.pt")
+    with open(f'F:/_WORKSPACE_PERSONAL/intuitivePhysics/_files/active/{object}-test.csv',mode= 'w', encoding='UTF8') as f:
+        writer = csv.writer(f)
+
+        # write the header
+        writer.writerow(header)
+
+        # write the data
+        writer.writerow(data)
+
+model = YOLO("yolov8N-seg.pt")
 
 
 if __name__ == "__main__":
@@ -148,20 +163,27 @@ if __name__ == "__main__":
             
             image_without_alpha = stream[:,:,:3] #esto consume 
             results=inferAndMakeBox(image_without_alpha,False)
-
             
-            #print(results[0].masks[0].xy) #cuando no hay nada se rompe
-
-            box_coordinates=results[0].boxes.xyxy.numpy()
-            location=getBoxCenter(box_coordinates)
-
-            cv2.circle(stream, location, 5, (0,255,100), -1)
-
-            viewer.updateData(point_cloud)
-            point3D=get3dPoint(location[0],location[1],point_cloud,depth)
-            trail.append(point3D)
-            print(point_cloud)
             print(FPS())
+            
+            for result in results:
+                #prin (item)   
+                #print(result)
+                boxes=result.boxes
+                
+                for box in boxes:
+                    box_coordinates=box.xyxy.numpy()
+                    location=getBoxCenter(box_coordinates)
+                    #print(box_coordinates,location)
+                    cv2.circle(stream, location, 5, (0,255,100), -1)
+                    saveCSV(location[0],location[1],location[2])
+
+            #viewer.updateData(point_cloud)
+            point3D=get3dPoint(location[0],location[1],point_cloud,depth)
+            print(point3D)
+            #trail.append(point3D)
+            #print(point_cloud)
+            #print("sd")
             
             cv2.imshow('video',stream)
 
