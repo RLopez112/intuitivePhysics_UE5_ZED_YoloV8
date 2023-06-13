@@ -31,6 +31,12 @@ import math
 import cv2
 import csv
 
+from datetime import datetime
+
+
+
+
+
 def parseArg(argLen, argv, param):
     if(argLen>1):
         if(".svo" in argv):
@@ -103,19 +109,26 @@ def FPS():
     currentFPS = str(zed.get_current_fps())
     return currentFPS
 
-def saveCSV(x,y,z,object):
-    location = "(X="+str(x)+"Y="+str(y)+"Z="+str(z)+")"
-    header = ['---', 'boundingBoxLocation', 'boundingBoxRotation', 'boundingBoxScale','SHAPE','fbxPath','pointCloudPath','SimulatePhysicsFromStart?','GravitiAffectsIt?','id','initialSpeedVector']
-    data = ['NewRow',location,'(Pitch=0,Yaw=0,Roll=0)','(X=1,Y=1,Z=1)',0]
+def saveCSV(object,x,y,z,velocity,shape,SimulatePhysicsFromStart,gravitiAffectsIt,id):
+    location = "(X="+str(x)+",Y="+str(y)+",Z="+str(z)+")"
+    header = ['---', 'boundingBoxLocation', 'boundingBoxRotation','boundingBoxScale', 'time_stamp','SHAPE','SimulatePhysicsFromStart?','GravitiAffectsIt?','id','initialSpeedVector']
+    
+    now = datetime.now()
 
-    with open(f'F:/_WORKSPACE_PERSONAL/intuitivePhysics/_files/active/{object}-test.csv',mode= 'w', encoding='UTF8') as f:
+    
+    
+    data = ['NewRow',location,'(Pitch=0,Yaw=0,Roll=0)','(X=1,Y=1,Z=1)',now,shape,SimulatePhysicsFromStart,gravitiAffectsIt,id,velocity]
+
+    with open(f'F:/_WORKSPACE_PERSONAL/intuitivePhysics/_files/active/{object}-test.csv','a', encoding='UTF8', newline='') as f:
         writer = csv.writer(f)
 
         # write the header
-        writer.writerow(header)
+        #writer.writerow(header)
 
         # write the data
         writer.writerow(data)
+        #writer.writerow('\n')
+
 
 model = YOLO("yolov8N-seg.pt")
 
@@ -130,6 +143,8 @@ if __name__ == "__main__":
     
 
     trail=[]
+    trailpos = 0
+
     if (len(sys.argv) > 1):
         parseArg(len(sys.argv), sys.argv[1], init)
     zed = sl.Camera()
@@ -166,26 +181,55 @@ if __name__ == "__main__":
             
             print(FPS())
             
-            for result in results:
-                #prin (item)   
-                #print(result)
-                boxes=result.boxes
-                
-                for box in boxes:
-                    box_coordinates=box.xyxy.numpy()
-                    location=getBoxCenter(box_coordinates)
-                    #print(box_coordinates,location)
-                    cv2.circle(stream, location, 5, (0,255,100), -1)
-                    saveCSV(location[0],location[1],location[2])
 
-            #viewer.updateData(point_cloud)
-            point3D=get3dPoint(location[0],location[1],point_cloud,depth)
-            print(point3D)
-            #trail.append(point3D)
-            #print(point_cloud)
-            #print("sd")
-            
+            # =====================================   GET ALL OBJECTS
+            #for result in results:
+            #    #prin (item)   
+            #    #print(result)
+            #    boxes=result.boxes
+            #    
+            #    for box in boxes:
+            #        box_coordinates=box.xyxy.numpy()
+            #        location=getBoxCenter(box_coordinates)
+            #        #print(box_coordinates,location)
+            #        point3D=get3dPoint(location[0],location[1],point_cloud,depth)
+            #        cv2.circle(stream, location, 5, (0,255,100), -1)
+            #        saveCSV(location[0],location[1],location[2],"df")
+            # ========================================================================================
+
+            # ======================================= ONLY ONE OBJECT
+
+            results = model.predict(source=image_without_alpha,show = False, conf = 0.3) 
+            boxCoordinates=results[0].boxes.xyxy.numpy()
+
+            if boxCoordinates.size > 0:
+                
+                location=getBoxCenter(boxCoordinates)
+                viewer.updateData(point_cloud)
+                point3D=get3dPoint(round(location[0],2),round(location[1],2),point_cloud,depth)
+
+                cv2.circle(stream, location, 5, (0,255,100), -1)
+
+                print(point3D)
+                trail.append(point3D)
+                
+                #saveCSV(object,x,y,z,velocity,shape,SimulatePhysicsFromStart,gravitiAffectsIt,id):
+                if len(trail)>=2:
+                    saveCSV("APPLE",round(point3D[0],2),round(point3D[1],2),round(point3D[2],2),trail[trailpos-1],1,0,0,1)
+                else:
+                    saveCSV("APPLE",round(point3D[0],2),round(point3D[1],2),round(point3D[2],2),0,1,0,0,1)
+
+
+                trailpos = trailpos + 1
+                
+
+            else:
+                print('The array has a size of 0')
+
+            # ========================================================================================
+
             cv2.imshow('video',stream)
+            
 
     viewer.exit()
     print(trail)
