@@ -103,13 +103,13 @@ def get3dPoint(x,y,point_cloud,depth):
     y_cloud = point3D[1][1]*100
     z_cloud = point3D[1][2]*100
     z_depth=depth.get_value(x,y)[1]
-    return (x_cloud,y_cloud,z_cloud)
+    return (round(x_cloud,2),round(y_cloud,2),round(z_cloud,2))
 
 def FPS():
     currentFPS = str(zed.get_current_fps())
     return currentFPS
 
-def saveCSV(object,x,y,z,velocity,shape,SimulatePhysicsFromStart,gravitiAffectsIt,id):
+def saveCSV(object,frameNumber,x,y,z,shape,SimulatePhysicsFromStart,gravitiAffectsIt,id,velocityDirection,velocityModule):
     location = "(X="+str(x)+",Y="+str(y)+",Z="+str(z)+")"
     header = ['---', 'boundingBoxLocation', 'boundingBoxRotation','boundingBoxScale', 'time_stamp','SHAPE','SimulatePhysicsFromStart?','GravitiAffectsIt?','id','initialSpeedVector']
     
@@ -117,9 +117,9 @@ def saveCSV(object,x,y,z,velocity,shape,SimulatePhysicsFromStart,gravitiAffectsI
 
     
     
-    data = ['NewRow',location,'(Pitch=0,Yaw=0,Roll=0)','(X=1,Y=1,Z=1)',now,shape,SimulatePhysicsFromStart,gravitiAffectsIt,id,velocity]
+    data = [f'NewRow_{frameNumber}',location,'(Pitch=0,Yaw=0,Roll=0)','(X=1,Y=1,Z=1)',shape,SimulatePhysicsFromStart,gravitiAffectsIt,id,velocityDirection,velocityModule,now]
 
-    with open(f'F:/_WORKSPACE_PERSONAL/intuitivePhysics/_files/active/{object}-test.csv','a', encoding='UTF8', newline='') as f:
+    with open(f'F:/_WORKSPACE_PERSONAL/intuitivePhysics/_files/active/{object}.csv','a', encoding='UTF8', newline='') as f:
         writer = csv.writer(f)
 
         # write the header
@@ -210,14 +210,21 @@ if __name__ == "__main__":
 
                 cv2.circle(stream, location, 5, (0,255,100), -1)
 
-                print(point3D)
                 trail.append(point3D)
+
+
+
+                # REFERNCIA DE ESTRUCTURA CSV
+                # saveCSV(object,x,y,z,shape,SimulatePhysicsFromStart,gravitiAffectsIt,id,velocityDirection,velocityModule):
+                # data = ['NewRow',location,'(Pitch=0,Yaw=0,Roll=0)','(X=1,Y=1,Z=1)',shape,SimulatePhysicsFromStart,gravitiAffectsIt,id,velocityDirection,velocityModule,now]
                 
-                #saveCSV(object,x,y,z,velocity,shape,SimulatePhysicsFromStart,gravitiAffectsIt,id):
                 if len(trail)>=2:
-                    saveCSV("APPLE",round(point3D[0],2),round(point3D[1],2),round(point3D[2],2),trail[trailpos-1],1,0,0,1)
+                    if len(trail)>=25:
+                        saveCSV("continuous",trailpos , round(point3D[0],2)  ,round(point3D[1],2)  ,round(point3D[2],2)  ,1  ,1  ,1  ,1  ,trail[trailpos-1], 5  )
+                    else:
+                        saveCSV("continuous",trailpos , round(point3D[0],2)  ,round(point3D[1],2)  ,round(point3D[2],2)  ,1  ,0  ,0  ,1  ,trail[trailpos-1], 5  )
                 else:
-                    saveCSV("APPLE",round(point3D[0],2),round(point3D[1],2),round(point3D[2],2),0,1,0,0,1)
+                    saveCSV("continuous",trailpos , round(point3D[0],2)  ,round(point3D[1],2)  ,round(point3D[2],2)  ,1  ,0  ,0  ,1  ,0  , 0 )
 
 
                 trailpos = trailpos + 1
